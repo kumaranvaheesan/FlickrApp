@@ -7,15 +7,13 @@
 //
 
 import UIKit
-import AlamofireImage
-import Alamofire
 
 class DetailViewController: UIViewController,FlickrPhotoInfoDelegate,UITableViewDelegate,UITableViewDataSource {
     
     @IBOutlet var tableView: UITableView!
     
     @IBOutlet weak var detailDescriptionLabel: UILabel!
-    var photoInfo : PhotoInfo!
+    var photoInfo : FlickrPhotoInfo!
     var spinner = UIActivityIndicatorView()
     var imageURL : String!
     var photoId : String!
@@ -54,20 +52,21 @@ class DetailViewController: UIViewController,FlickrPhotoInfoDelegate,UITableView
         
     }
     
-    func didreceivePhotoInfo(photoInfo: PhotoInfo) {
-        
+    func didreceivePhotoInfo(photoInfo: FlickrPhotoInfo) {
+         DispatchQueue.main.async {
         self.photoInfo = photoInfo
         self.tableView.reloadData()
-        spinner.stopAnimating()
-        
+        self.spinner.stopAnimating()
+        }
     }
     func didNotreceivePhotoInfo(error: NSError) {
-        
-        spinner.stopAnimating()
+
+         DispatchQueue.main.async {
         let alert = UIAlertController(title: "Error", message: "There seems to be an error connecting to the server. Please try again later.", preferredStyle: UIAlertControllerStyle.alert)
         alert.addAction(UIAlertAction(title: "OK", style: UIAlertActionStyle.default, handler: nil))
         self.present(alert, animated: true, completion: nil)
         self.spinner.stopAnimating()
+        }
         
     }
     
@@ -98,23 +97,13 @@ class DetailViewController: UIViewController,FlickrPhotoInfoDelegate,UITableView
         case 0:
             
             let cell = tableView.dequeueReusableCell(withIdentifier: "ImageCell")! as! detailImageCell
-            Alamofire.request(imageURL).responseImage { response in
-                
-                if let image = response.result.value {
-                    print("image downloaded: \(image)")
-                    DispatchQueue.main.async {
-                        cell.detailImageView.image = image
-                        
-                    }
-                }
-            }
-            
+            cell.detailImageView.imageFromServerURL(urlString: imageURL)
             return cell
             
         case 1:
             
             cell.fieldLabel.text = "Title"
-            if let title = self.photoInfo.title?.titleContent{
+            if let title = self.photoInfo?.title{
                 cell.detailLabel.text = title
             }
             return cell
@@ -122,7 +111,7 @@ class DetailViewController: UIViewController,FlickrPhotoInfoDelegate,UITableView
         case 2:
             
             cell.fieldLabel.text = "Description"
-            if let description = self.photoInfo.description?.descriptionContent{
+            if let description = self.photoInfo?.description{
                 cell.detailLabel.text = description
                 
             }
@@ -132,27 +121,21 @@ class DetailViewController: UIViewController,FlickrPhotoInfoDelegate,UITableView
         case 3:
             
             cell.fieldLabel.text = "Owner"
-            cell.detailLabel.text = self.photoInfo.owner?.userName!
+            cell.detailLabel.text = self.photoInfo?.owner
             return cell
             
         case 4:
             
             cell.fieldLabel.text = "Date Taken"
-            cell.detailLabel.text = self.convertDateFormatter(date: (self.photoInfo.dates?.taken)!)
+            cell.detailLabel.text = self.convertDateFormatter(date: (self.photoInfo?.date)!)
             return cell
             
         case 5:
             
             cell.fieldLabel.text = "Tags"
             
-            if self.photoInfo.tags != nil{
-                var tags = ""
-                let tagsArray = self.photoInfo.tags?.tag
-                for tagContent in tagsArray! {
-                    tags.append(tagContent.tag! )
-                    tags.append(" ")
-                }
-                cell.detailLabel.text = tags
+            if self.photoInfo?.tags != nil{
+                cell.detailLabel.text = self.photoInfo?.tags
             }
             return cell
             

@@ -8,8 +8,6 @@
 
 import UIKit
 import CoreLocation
-import AlamofireImage
-import Alamofire
 
 class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchBarDelegate, CLLocationManagerDelegate {
     
@@ -75,7 +73,6 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
         searchBar.endEditing(true)
     }
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        print("searchText \(searchBar.text)")
         spinner.startAnimating()
         flickrClient.getPhotosUsingTags(searchText:searchBar.text)
         self.searchBar.resignFirstResponder()
@@ -84,28 +81,25 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
     
     func getFlickrPhotosByLocation()
     {
-        spinner.startAnimating()
-        print(self.currentLocation)
+        self.spinner.startAnimating()
         flickrClient.getPhotosUsingLocation(currentLocation: self.currentLocation)
     }
     
-    
-    
     func didreceivePhotos(photosArray : [Any]) {
-        print("received")
-        
-        self.photosList = photosArray
-        self.tableView.reloadData()
-        spinner.stopAnimating()
-        
+        DispatchQueue.main.async {
+            self.photosList = photosArray
+            self.tableView.reloadData()
+            self.spinner.stopAnimating()
+        }
     }
+    
     func didNotreceivePhotos(error: NSError) {
-        spinner.stopAnimating()
-        let alert = UIAlertController(title: "Error", message: "There seems to be an error connecting to the server. Please try again later.", preferredStyle: UIAlertControllerStyle.alert)
-        alert.addAction(UIAlertAction(title: "OK", style: UIAlertActionStyle.default, handler: nil))
-        self.present(alert, animated: true, completion: nil)
-        self.spinner.stopAnimating()
-        
+        DispatchQueue.main.async {
+            let alert = UIAlertController(title: "Error", message: "There seems to be an error connecting to the server. Please try again later.", preferredStyle: UIAlertControllerStyle.alert)
+            alert.addAction(UIAlertAction(title: "OK", style: UIAlertActionStyle.default, handler: nil))
+            self.present(alert, animated: true, completion: nil)
+            self.spinner.stopAnimating()
+        }
     }
     
     
@@ -113,7 +107,6 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
     func setupSpinner(){
         
         spinner = UIActivityIndicatorView(frame: CGRect(x: 0, y: 0, width: 60, height:60))
-        
         self.spinner.center = self.view.center
         self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyle.gray
         let transform: CGAffineTransform = CGAffineTransform(scaleX: 1.5, y: 1.5)
@@ -128,10 +121,10 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "showDetail" {
             if let indexPath = self.tableView.indexPathForSelectedRow {
-                let photo = photosList[indexPath.row] as! Photo
+                let photo = photosList[indexPath.row] as! FlickrPhoto
                 var controller = (segue.destination as! UINavigationController).topViewController as! DetailViewController
                 controller.imageURL = photo.photoUrl()
-                controller.photoId = photo.photoId
+                controller.photoId = photo.id
                 controller.navigationItem.leftBarButtonItem = self.splitViewController?.displayModeButtonItem
                 controller.navigationItem.leftItemsSupplementBackButton = true
                 
@@ -142,11 +135,9 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
     
     //MARK: - Location Service
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        print("Did location updates is called")
         self.currentLocation = locations[0] as CLLocation
         self.getFlickrPhotosByLocation()
         self.locationManager.stopUpdatingLocation()
-        
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -166,22 +157,30 @@ class MasterViewController: UITableViewController,FlickrGetterDelegate,UISearchB
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CustomTableViewCell")! as! CustomTableViewCell
         
-        let photo = photosList[indexPath.row] as! Photo
+        let photo = photosList[indexPath.row] as! FlickrPhoto
         cell.titleLabel.text = photo.title
-        print(photo.photoId ?? "")
-        Alamofire.request(photo.photoUrl()).responseImage { response in
-            
-            if let image = response.result.value {
-                DispatchQueue.main.async {
-                    cell.flickerImageView?.image = image
-                    
-                }
-            }
-        }
-        
+        cell.flickerImageView.imageFromServerURL(urlString: photo.photoUrl())
         return cell
     }
     
-    
 }
+
+//Extension for loading Image from server asynchronously
+
+extension UIImageView {
+    public func imageFromServerURL(urlString: String) {
+        
+        URLSession.shared.dataTask(with: NSURL(string: urlString)! as URL, completionHandler: { (data, response, error) -> Void in
+            
+            if error != nil {
+                return
+            }
+            DispatchQueue.main.async(execute: { () -> Void in
+                let image = UIImage(data: data!)
+                self.image = image
+            })
+            
+        }).resume()
+    }}
+
 

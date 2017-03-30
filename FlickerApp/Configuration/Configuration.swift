@@ -49,5 +49,4 @@ struct APIURL {
         return flickrURL
     }
     
-    
 }
